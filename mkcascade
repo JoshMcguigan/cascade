@@ -16,6 +16,7 @@ tar -xf rootfs.tar.gz -C rootfs
 echo "nameserver 8.8.8.8" > rootfs/etc/resolv.conf
 
 sudo mount -t proc none rootfs/proc
+sudo mknod -m 666 rootfs/dev/null c 1 3
 
 echo $'export RUSTUP_HOME=/usr/local/bin\nexport CARGO_HOME=/usr/local' > rootfs/etc/profile.d/10rust.sh
 
