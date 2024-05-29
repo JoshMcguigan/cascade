@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -e
+
+REPO_ROOT_DIR=$(dirname "$SCRIPT")
+TARGET_DIR=$REPO_ROOT_DIR/target
+
+mkdir -p $TARGET_DIR
+cd $TARGET_DIR
+
+wget -O rootfs.tar.gz https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.0-x86_64.tar.gz
+
+mkdir rootfs
+tar -xf rootfs.tar.gz -C rootfs
+
+echo "nameserver 8.8.8.8" > rootfs/etc/resolv.conf
+
+sudo mount -t proc none rootfs/proc
+
+echo $'export RUSTUP_HOME=/usr/local/bin\nexport CARGO_HOME=/usr/local' > rootfs/etc/profile.d/10rust.sh
+
+cp ../install rootfs/sbin
+

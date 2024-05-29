@@ -1,0 +1,6 @@
+#!/bin/sh
+
+apk add build-base rustup
+
+rustup-init
+

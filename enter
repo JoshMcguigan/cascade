@@ -1,0 +1,4 @@
+#!/bin/sh
+
+sudo chroot target/rootfs /bin/ash -l
+
