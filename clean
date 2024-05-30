@@ -1,4 +1,0 @@
-#!/bin/sh
-
-sudo umount target/rootfs/proc
-sudo rm -rf target

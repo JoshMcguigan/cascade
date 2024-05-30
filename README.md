@@ -1,17 +1,20 @@
 # Cascade
 
+## Run Cascade in a container
+
 ```sh
-$ ./mkcascade
-
-$ ./enter
-
-$ /sbin/install
-
-$ cargo install cowsay
-
-$ cowsay hi
-
-$ cargo install cowsay --force
-
-# why is rust broken on this second invocation? :(
+just container
 ```
+
+## Development dependencies
+
+### youki
+
+```
+cargo install --git https://github.com/containers/youki youki@0.3.3 --force --features systemd
+```
+
+### just
+
+[Installation instructions](https://github.com/casey/just?tab=readme-ov-file#installation)
+
