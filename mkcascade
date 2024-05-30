@@ -8,26 +8,49 @@ TARGET_DIR=$REPO_ROOT_DIR/target
 mkdir -p $TARGET_DIR
 cd $TARGET_DIR
 
+if [ -d rootfs ]; then
+  # no work to do
+  exit
+fi
+
 if [ ! -f rootfs.tar.gz ]; then
   wget -O rootfs.tar.gz https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.0-x86_64.tar.gz
 fi
 
-
 mkdir -p rootfs
 tar -xf rootfs.tar.gz -C rootfs
 
-echo "nameserver 8.8.8.8" > rootfs/etc/resolv.conf
+echo 'export PATH=/root/.cargo/bin:$PATH' > rootfs/etc/profile.d/10rust.sh
 
-echo $'export RUSTUP_HOME=/usr/local/bin\nexport CARGO_HOME=/usr/local' > rootfs/etc/profile.d/10rust.sh
+echo "nameserver 8.8.8.8" > rootfs/etc/resolv.conf
 
 echo '
 #!/bin/sh
 
+set -e
+
 apk add build-base rustup
 
+# We are not modifying path here because we handle that above
+# with the write to /etc/profile. However we do source the env
+# file short term, just so this terminal session has it set.
 rustup-init --no-modify-path -y
+source /root/.cargo/env
 
-# clean up after rustup
-rm /usr/local/env
-' > rootfs/sbin/install
+# setup coreutils
+cargo install --git https://github.com/uutils/coreutils coreutils --version 0.0.26
+
+# need to set this permission to allow symlinking into root
+chmod +x /root
+
+# TODO map more coreutils over busybox here
+# force is needed here to write over the existing file (which
+# itself it a symlink to the busybox binary)
+ln -sf /root/.cargo/bin/coreutils /bin/ls
+
+# delete this script after it runs
+rm /setup
+' > rootfs/setup
+
+chmod +x rootfs/setup
 

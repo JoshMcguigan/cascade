@@ -77,7 +77,7 @@
     },
     "args": [ "/bin/ash", "-l" ],
     "env": [
-      "PATH=/bin",
+      "PATH=required_placeholder",
       "TERM=xterm"
     ],
     "cwd": "/",

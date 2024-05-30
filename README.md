@@ -4,6 +4,9 @@
 
 ```sh
 just container
+
+# inside the container
+$ ./setup
 ```
 
 ## Development dependencies

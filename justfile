@@ -1,9 +1,12 @@
-run-container: rootfs
-  youki run cascade -b container
+default:
+  just --list
+
+container: rootfs
+  -youki run cascade -b container
 
 rootfs:
   ./mkcascade
 
 clean:
   -sudo umount target/rootfs/proc
-  -sudo rm -rf target
+  -sudo rm -rf target/rootfs
