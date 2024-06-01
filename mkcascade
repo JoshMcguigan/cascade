@@ -4,53 +4,69 @@ set -e
 
 REPO_ROOT_DIR=$(dirname "$SCRIPT")
 TARGET_DIR=$REPO_ROOT_DIR/target
+HD_PATH=$TARGET_DIR/kernel-hd
+CASCADE_DIR=/var/cascade
 
-mkdir -p $TARGET_DIR
-cd $TARGET_DIR
-
-if [ -d rootfs ]; then
-  # no work to do
-  exit
+if [ ! -f $TARGET_DIR/rootfs.tar.gz ]; then
+  mkdir -p $TARGET_DIR
+  wget -O $TARGET_DIR/rootfs.tar.gz https://distfiles.gentoo.org/releases/amd64/autobuilds/20240526T163557Z/stage3-amd64-openrc-20240526T163557Z.tar.xz
 fi
+if [ ! -d $CASCADE_DIR/bin ]; then
+  sudo mkdir -p $CASCADE_DIR
+  sudo tar xpf $TARGET_DIR/rootfs.tar.gz --xattrs-include='*.*' --numeric-owner -C $CASCADE_DIR
 
-if [ ! -f rootfs.tar.gz ]; then
-  wget -O rootfs.tar.gz https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/x86_64/alpine-minirootfs-3.20.0-x86_64.tar.gz
+  echo "nameserver 8.8.8.8" | sudo dd of=$CASCADE_DIR/etc/resolv.conf
+  
+  sudo mount --rbind /dev $CASCADE_DIR/dev
+  sudo mount --make-rslave $CASCADE_DIR/dev
+  sudo mount -t proc /proc $CASCADE_DIR/proc
+  sudo mount --rbind /sys $CASCADE_DIR/sys
+  sudo mount --make-rslave $CASCADE_DIR/sys
+  sudo mount --rbind /tmp $CASCADE_DIR/tmp
+  # Gentoo docs specifying mounting /run, but
+  # we skip that because configs end up being
+  # saved here and we want to copy it to the
+  # final disk image, so we don't want anything
+  # from the underlying host machine included.
+  # sudo mount --bind /run $CASCADE_DIR/run
+
+  # Configure the image
+  #
+  # Enable the serial console
+  sudo sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
+  
+  echo "
+  #!/bin/sh
+  
+  # This assumes that there aren't any other USE flags
+  # set by default.
+  echo 'USE="dracut"' > /etc/portage/make.conf
+
+  emerge-webrsync
+  emerge sys-kernel/gentoo-kernel-bin
+  " | sudo dd of=$CASCADE_DIR/setup
+  sudo chmod +x $CASCADE_DIR/setup
+  sudo chroot $CASCADE_DIR /setup
+  sudo rm $CASCADE_DIR/setup
+
+  sudo umount -lf $CASCADE_DIR/dev
+  sudo umount -lf $CASCADE_DIR/proc
+  sudo umount -lf $CASCADE_DIR/sys
+  sudo umount -lf $CASCADE_DIR/tmp
+
+  # Make disk image
+  dd if=/dev/zero of=$HD_PATH bs=1M count=10000
+  
+  TMP_MNT=/mnt/cascade
+  sudo mkdir -p $TMP_MNT
+  sudo mkfs.ext4 $HD_PATH
+  sudo mount $HD_PATH $TMP_MNT
+  sudo cp -r $CASCADE_DIR/* $TMP_MNT
+  
+  # Create blank root password
+  sudo passwd --root $TMP_MNT root -d
+  
+  sudo umount $TMP_MNT
+  unset TMP_MNT
 fi
-
-mkdir -p rootfs
-tar -xf rootfs.tar.gz -C rootfs
-
-echo 'export PATH=/root/.cargo/bin:$PATH' > rootfs/etc/profile.d/10rust.sh
-
-echo "nameserver 8.8.8.8" > rootfs/etc/resolv.conf
-
-echo '
-#!/bin/sh
-
-set -e
-
-apk add build-base rustup
-
-# We are not modifying path here because we handle that above
-# with the write to /etc/profile. However we do source the env
-# file short term, just so this terminal session has it set.
-rustup-init --no-modify-path -y
-source /root/.cargo/env
-
-# setup coreutils
-cargo install --git https://github.com/uutils/coreutils coreutils --version 0.0.26
-
-# need to set this permission to allow symlinking into root
-chmod +x /root
-
-# TODO map more coreutils over busybox here
-# force is needed here to write over the existing file (which
-# itself it a symlink to the busybox binary)
-ln -sf /root/.cargo/bin/coreutils /bin/ls
-
-# delete this script after it runs
-rm /setup
-' > rootfs/setup
-
-chmod +x rootfs/setup
 

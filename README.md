@@ -1,21 +1,14 @@
 # Cascade
 
-## Run Cascade in a container
+For now, Cascade defines a minimal and automated path to booting a [stage 3 Gentoo tarball](https://wiki.gentoo.org/wiki/Stage_file#Stage_3).
+
+## Run Cascade in a QEMU virtual machine
 
 ```sh
-just container
-
-# inside the container
-$ ./setup
+just vm
 ```
 
 ## Development dependencies
-
-### youki
-
-```
-cargo install --git https://github.com/containers/youki youki@0.3.3 --force --features systemd
-```
 
 ### just
 
