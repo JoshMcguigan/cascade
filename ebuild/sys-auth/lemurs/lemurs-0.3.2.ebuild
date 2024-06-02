@@ -68,13 +68,12 @@ CRATES="
 inherit cargo
 
 DESCRIPTION="A TUI Display/Login Manager"
-# Double check the homepage as the cargo_metadata crate
-# does not provide this value so instead repository is used
 HOMEPAGE="https://github.com/coastalwhite/lemurs"
-SRC_URI="$(cargo_crate_uris)"
+SRC_URI="
+	https://github.com/coastalwhite/lemurs/archive/refs/tags/v${PV}.tar.gz -> ${P}.tar.gz
+	${CARGO_CRATE_URIS}
+"
 
-# License set may be more restrictive as OR is not respected
-# use cargo-license for a more accurate license picture
 LICENSE="Apache-2.0 Apache-2.0-with-LLVM-exceptions MIT Unicode-DFS-2016"
 SLOT="0"
 KEYWORDS="amd64"
@@ -91,6 +90,11 @@ src_install() {
 	cargo_src_install
 
 	insinto /etc/pam.d/
-	doins extras/lemurs.pam
+	doins extra/lemurs.pam
+}
+
+pkg_postinst() {
+	einfo "Lemurs has been installed but is not yet configured. You'll need"
+	einfo "to update your init system to call Lemurs."
 }
 

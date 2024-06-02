@@ -20,7 +20,6 @@ clean:
   -sudo umount -lf /var/cascade/dev
   -sudo umount -lf /var/cascade/proc
   -sudo umount -lf /var/cascade/sys
-  -sudo umount -lf /var/cascade/tmp
   -sudo rm -rf target/rootfs
   -sudo rm -rf /var/cascade
 

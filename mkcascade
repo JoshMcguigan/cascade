@@ -22,7 +22,11 @@ if [ ! -d $CASCADE_DIR/bin ]; then
   sudo mount -t proc /proc $CASCADE_DIR/proc
   sudo mount --rbind /sys $CASCADE_DIR/sys
   sudo mount --make-rslave $CASCADE_DIR/sys
-  sudo mount --rbind /tmp $CASCADE_DIR/tmp
+  # TODO can we get away with this?
+  # we just use a regular directory for /tmp
+  # and delete it below
+  # sudo mount --rbind /tmp $CASCADE_DIR/tmp
+  mkdir -p /tmp
   # Gentoo docs specifying mounting /run, but
   # we skip that because configs end up being
   # saved here and we want to copy it to the
@@ -32,24 +36,52 @@ if [ ! -d $CASCADE_DIR/bin ]; then
 
   # Configure the image
   #
-  # Enable the serial console
-  sudo sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
-  # TODO this enables lemurs as login solution
-  # s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs
-  # in order to authorize lemurs for pam
-  # also need `sudo cp /mnt/cascade/etc/pam.d/{login,lemurs}`
-  # need to create cascade local repo and create sys-auth/lemurs
-  # reference https://wiki.gentoo.org/wiki/Creating_an_ebuild_repository
+  # Enable the serial console and set lemurs as getty/login
+  sudo sed -i '/ttyS0/c\s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs' $CASCADE_DIR/etc/inittab
+  # this is if we want to use the standard init/getty
+  # sudo sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
+  # Configure PAM to allow access by lemurs
+  sudo cp $CASCADE_DIR/etc/pam.d/{login,lemurs}
+  # Copy in the Cascade ebuild repo
+  #
+  # For now we put this in tmp because we need
+  # to first create the local repo and then
+  # copy these in with the appropriate permissions.
+  sudo cp -r ebuild $CASCADE_DIR/tmp/
   
   echo "
   #!/bin/sh
+
+  set -e
+
+  # Really we should uncomment this rather than
+  # add a new line..
+  echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+  locale-gen
   
   # This assumes that there aren't any other USE flags
   # set by default.
   echo 'USE="dracut"' > /etc/portage/make.conf
 
   emerge-webrsync
+
+  # unmerge definitely doesn't seem like the right
+  # thing to do here, but this was causing a conflict
+  #
+  # https://www.gentoo.org/support/news-items/2024-05-09-python3-12.html
+  #
+  # The latest stage file doesn't include python 3.12 yet
+  emerge --unmerge dev-python/hatchling
   emerge sys-kernel/gentoo-kernel-bin
+
+  # Add a local repository
+  emerge app-eselect/eselect-repository
+  eselect repository create cascade
+  mv /tmp/ebuild/* /var/db/repos/cascade
+  rm -r /tmp/ebuild
+  chown -R portage:portage /var/db/repos/cascade
+  ebuild /var/db/repos/cascade/sys-auth/lemurs/*.ebuild manifest
+  emerge sys-auth/lemurs
   " | sudo dd of=$CASCADE_DIR/setup
   sudo chmod +x $CASCADE_DIR/setup
   sudo chroot $CASCADE_DIR /setup
@@ -58,7 +90,7 @@ if [ ! -d $CASCADE_DIR/bin ]; then
   sudo umount -lf $CASCADE_DIR/dev
   sudo umount -lf $CASCADE_DIR/proc
   sudo umount -lf $CASCADE_DIR/sys
-  sudo umount -lf $CASCADE_DIR/tmp
+  sudo rm -r $CASCADE_DIR/tmp/*
 
   # Make disk image
   dd if=/dev/zero of=$HD_PATH bs=1M count=10000
