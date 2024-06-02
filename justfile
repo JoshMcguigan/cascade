@@ -14,7 +14,7 @@ unmount: rootfs
   sudo umount /mnt/cascade
 
 rootfs:
-  ./mkcascade
+  sudo ./mkcascade
 
 clean:
   -sudo umount -lf /var/cascade/dev

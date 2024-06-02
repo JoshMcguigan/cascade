@@ -12,42 +12,42 @@ if [ ! -f $TARGET_DIR/rootfs.tar.gz ]; then
   wget -O $TARGET_DIR/rootfs.tar.gz https://distfiles.gentoo.org/releases/amd64/autobuilds/20240526T163557Z/stage3-amd64-openrc-20240526T163557Z.tar.xz
 fi
 if [ ! -d $CASCADE_DIR/bin ]; then
-  sudo mkdir -p $CASCADE_DIR
-  sudo tar xpf $TARGET_DIR/rootfs.tar.gz --xattrs-include='*.*' --numeric-owner -C $CASCADE_DIR
+  mkdir -p $CASCADE_DIR
+  tar xpf $TARGET_DIR/rootfs.tar.gz --xattrs-include='*.*' --numeric-owner -C $CASCADE_DIR
 
-  echo "nameserver 8.8.8.8" | sudo dd of=$CASCADE_DIR/etc/resolv.conf
+  echo "nameserver 8.8.8.8" | dd of=$CASCADE_DIR/etc/resolv.conf
   
-  sudo mount --rbind /dev $CASCADE_DIR/dev
-  sudo mount --make-rslave $CASCADE_DIR/dev
-  sudo mount -t proc /proc $CASCADE_DIR/proc
-  sudo mount --rbind /sys $CASCADE_DIR/sys
-  sudo mount --make-rslave $CASCADE_DIR/sys
+  mount --rbind /dev $CASCADE_DIR/dev
+  mount --make-rslave $CASCADE_DIR/dev
+  mount -t proc /proc $CASCADE_DIR/proc
+  mount --rbind /sys $CASCADE_DIR/sys
+  mount --make-rslave $CASCADE_DIR/sys
   # TODO can we get away with this?
   # we just use a regular directory for /tmp
   # and delete it below
-  # sudo mount --rbind /tmp $CASCADE_DIR/tmp
+  # mount --rbind /tmp $CASCADE_DIR/tmp
   mkdir -p /tmp
   # Gentoo docs specifying mounting /run, but
   # we skip that because configs end up being
   # saved here and we want to copy it to the
   # final disk image, so we don't want anything
   # from the underlying host machine included.
-  # sudo mount --bind /run $CASCADE_DIR/run
+  # mount --bind /run $CASCADE_DIR/run
 
   # Configure the image
   #
   # Enable the serial console and set lemurs as getty/login
-  sudo sed -i '/ttyS0/c\s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs' $CASCADE_DIR/etc/inittab
+  sed -i '/ttyS0/c\s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs' $CASCADE_DIR/etc/inittab
   # this is if we want to use the standard init/getty
-  # sudo sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
+  # sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
   # Configure PAM to allow access by lemurs
-  sudo cp $CASCADE_DIR/etc/pam.d/{login,lemurs}
+  cp $CASCADE_DIR/etc/pam.d/{login,lemurs}
   # Copy in the Cascade ebuild repo
   #
   # For now we put this in tmp because we need
   # to first create the local repo and then
   # copy these in with the appropriate permissions.
-  sudo cp -r ebuild $CASCADE_DIR/tmp/
+  cp -r ebuild $CASCADE_DIR/tmp/
   
   echo "
   #!/bin/sh
@@ -82,29 +82,31 @@ if [ ! -d $CASCADE_DIR/bin ]; then
   chown -R portage:portage /var/db/repos/cascade
   ebuild /var/db/repos/cascade/sys-auth/lemurs/*.ebuild manifest
   emerge sys-auth/lemurs
-  " | sudo dd of=$CASCADE_DIR/setup
-  sudo chmod +x $CASCADE_DIR/setup
-  sudo chroot $CASCADE_DIR /setup
-  sudo rm $CASCADE_DIR/setup
+  " > $CASCADE_DIR/setup
+  chmod +x $CASCADE_DIR/setup
+  chroot $CASCADE_DIR /setup
+  rm $CASCADE_DIR/setup
 
-  sudo umount -lf $CASCADE_DIR/dev
-  sudo umount -lf $CASCADE_DIR/proc
-  sudo umount -lf $CASCADE_DIR/sys
-  sudo rm -r $CASCADE_DIR/tmp/*
+  umount -lf $CASCADE_DIR/dev
+  umount -lf $CASCADE_DIR/proc
+  umount -lf $CASCADE_DIR/sys
+  # We don't want to exit this script early if there
+  # are no files in here.
+  rm -r $CASCADE_DIR/tmp/* || true
 
   # Make disk image
   dd if=/dev/zero of=$HD_PATH bs=1M count=10000
   
   TMP_MNT=/mnt/cascade
-  sudo mkdir -p $TMP_MNT
-  sudo mkfs.ext4 $HD_PATH
-  sudo mount $HD_PATH $TMP_MNT
-  sudo cp -r $CASCADE_DIR/* $TMP_MNT
+  mkdir -p $TMP_MNT
+  mkfs.ext4 $HD_PATH
+  mount $HD_PATH $TMP_MNT
+  cp -r $CASCADE_DIR/* $TMP_MNT
   
   # Create blank root password
-  sudo passwd --root $TMP_MNT root -d
+  passwd --root $TMP_MNT root -d
   
-  sudo umount $TMP_MNT
+  umount $TMP_MNT
   unset TMP_MNT
 fi
 
