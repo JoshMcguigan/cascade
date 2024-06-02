@@ -34,6 +34,12 @@ if [ ! -d $CASCADE_DIR/bin ]; then
   #
   # Enable the serial console
   sudo sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
+  # TODO this enables lemurs as login solution
+  # s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs
+  # in order to authorize lemurs for pam
+  # also need `sudo cp /mnt/cascade/etc/pam.d/{login,lemurs}`
+  # need to create cascade local repo and create sys-auth/lemurs
+  # reference https://wiki.gentoo.org/wiki/Creating_an_ebuild_repository
   
   echo "
   #!/bin/sh

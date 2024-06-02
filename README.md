@@ -8,6 +8,8 @@ For now, Cascade defines a minimal and automated path to booting a [stage 3 Gent
 just vm
 ```
 
+You can exit QEMU with `ctrl-a x`. `ctrl-a c` will show the QEMU monitor.
+
 ## Development dependencies
 
 ### just
