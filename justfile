@@ -2,29 +2,16 @@ default:
   just --list
 
 chroot: rootfs
-  sudo chroot /var/stage0 /bin/bash
-
-vm: rootfs
-  qemu-system-x86_64 -kernel /var/cascade/boot/vmlinuz-* -initrd /var/cascade/boot/initramfs-* -m 1G -hda target/kernel-hd -append "root=/dev/sda console=ttyS0" -nographic -enable-kvm
-
-mount: rootfs
-  sudo mount target/kernel-hd /mnt/cascade
-
-unmount: rootfs
-  sudo umount /mnt/cascade
+  sudo chroot /var/stage3 /bin/bash
 
 rootfs:
   sudo ./mkcascade
 
 clean:
-  -sudo umount -lf /var/cascade/dev
-  -sudo umount -lf /var/cascade/proc
-  -sudo umount -lf /var/cascade/sys
-  -sudo umount -lf /var/stage0/dev
-  -sudo umount -lf /var/stage0/proc
-  -sudo umount -lf /var/stage0/sys
-  -sudo umount -lf /var/stage0/cascade
-  -sudo rm -rf /var/cascade
-  -sudo rm -rf /var/stage0
+  -sudo umount -lf /var/stage3/dev
+  -sudo umount -lf /var/stage3/proc
+  -sudo umount -lf /var/stage3/sys
+  -sudo umount -lf /var/stage3/cascade
+  -sudo rm -rf /var/stage3
   -sudo rm -rf target/rootfs
 

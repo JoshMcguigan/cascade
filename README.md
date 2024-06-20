@@ -1,14 +1,10 @@
 # Cascade
 
-For now, Cascade defines a minimal and automated path to booting a [stage 3 Gentoo tarball](https://wiki.gentoo.org/wiki/Stage_file#Stage_3).
-
-## Run Cascade in a QEMU virtual machine
+For now, Cascade defines a minimal and automated path to replace GNU coreutils with uutils coreutils in a [stage 3 Gentoo tarball](https://wiki.gentoo.org/wiki/Stage_file#Stage_3).
 
 ```sh
-just vm
+just clean chroot
 ```
-
-You can exit QEMU with `ctrl-a x`. `ctrl-a c` will show the QEMU monitor.
 
 ## Development dependencies
 
