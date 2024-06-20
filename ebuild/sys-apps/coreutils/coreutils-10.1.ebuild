@@ -368,7 +368,11 @@ src_compile() {
 		# CASCADE MOD: remove uu- prefix
 		PROG_PREFIX=""
 
-		MULTICALL=y
+		# CASCADE MOD: disable multicall
+		# It would be nice to use this, but it breaks because gentoo install-xattr follows
+		# symlinks and calls `install` as `coreutils` which breaks things.
+		MULTICALL=n
+
 		MANDIR="/share/man/man1"
 
 		SELINUX_ENABLED=$(usex selinux)
@@ -376,9 +380,13 @@ src_compile() {
 		# pinky, uptime, users, and who require utmpx (not available on musl)
 		# bug #832868
 		# SKIP_UTILS="$(usev elibc_musl "pinky uptime users who")"
-		# CASCADE MOD: we aren't building with musl, but we need to skip `more`
-		# because it is installed by sys-apps/util-linux
-		SKIP_UTILS="more"
+		# CASCADE MOD: we aren't building with musl, so we don't need to skip all these
+		# ..
+		# but we need to skip `more` because it is installed by sys-apps/util-linux
+		# and we need to skip `hostname` because it is installed by sys-apps/net-tools
+		# and we need to skip `kill`/`uptime` because it is installed by sys-process/procps
+		# and we need to skip `groups` because it is installed by sys-apps/shadow
+		SKIP_UTILS="more hostname kill uptime groups"
 	)
 
 	emake "${makeargs[@]}"
@@ -392,4 +400,5 @@ src_test() {
 
 src_install() {
 	emake "${makeargs[@]}" DESTDIR="${D}" install
+	dobin "${FILESDIR}/md5sum"
 }

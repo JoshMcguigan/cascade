@@ -4,49 +4,58 @@ set -e
 
 REPO_ROOT_DIR=$(dirname "$SCRIPT")
 TARGET_DIR=$REPO_ROOT_DIR/target
-HD_PATH=$TARGET_DIR/kernel-hd
+
+STAGE0_DIR=/var/stage0
 CASCADE_DIR=/var/cascade
+HD_PATH=$TARGET_DIR/kernel-hd
 
 if [ ! -f $TARGET_DIR/rootfs.tar.gz ]; then
   mkdir -p $TARGET_DIR
-  wget -O $TARGET_DIR/rootfs.tar.gz https://distfiles.gentoo.org/releases/amd64/autobuilds/20240526T163557Z/stage3-amd64-openrc-20240526T163557Z.tar.xz
+  URL=https://distfiles.gentoo.org/releases/amd64/autobuilds/20240602T164858Z/stage3-amd64-openrc-20240602T164858Z.tar.xz
+  wget -O $TARGET_DIR/rootfs.tar.gz $URL
+  unset URL
 fi
-if [ ! -d $CASCADE_DIR/bin ]; then
-  mkdir -p $CASCADE_DIR
-  tar xpf $TARGET_DIR/rootfs.tar.gz --xattrs-include='*.*' --numeric-owner -C $CASCADE_DIR
+if [ ! -d $STAGE0_DIR/bin ]; then
+  mkdir -p $STAGE0_DIR
+  tar xpf $TARGET_DIR/rootfs.tar.gz --xattrs-include='*.*' --numeric-owner -C $STAGE0_DIR
 
-  echo "nameserver 8.8.8.8" | dd of=$CASCADE_DIR/etc/resolv.conf
+  echo "nameserver 8.8.8.8" > $STAGE0_DIR/etc/resolv.conf
   
-  mount --rbind /dev $CASCADE_DIR/dev
-  mount --make-rslave $CASCADE_DIR/dev
-  mount -t proc /proc $CASCADE_DIR/proc
-  mount --rbind /sys $CASCADE_DIR/sys
-  mount --make-rslave $CASCADE_DIR/sys
+  mount --rbind /dev $STAGE0_DIR/dev
+  mount --make-rslave $STAGE0_DIR/dev
+  mount -t proc /proc $STAGE0_DIR/proc
+  mount --rbind /sys $STAGE0_DIR/sys
+  mount --make-rslave $STAGE0_DIR/sys
   # TODO can we get away with this?
   # we just use a regular directory for /tmp
   # and delete it below
-  # mount --rbind /tmp $CASCADE_DIR/tmp
+  # mount --rbind /tmp $STAGE0_DIR/tmp
   mkdir -p /tmp
   # Gentoo docs specifying mounting /run, but
   # we skip that because configs end up being
   # saved here and we want to copy it to the
   # final disk image, so we don't want anything
   # from the underlying host machine included.
-  # mount --bind /run $CASCADE_DIR/run
+  # mount --bind /run $STAGE0_DIR/run
+  
+  # Link Cascade into stage0.
+  mkdir -p $CASCADE_DIR
+  mkdir $STAGE0_DIR/cascade
+  mount --bind $CASCADE_DIR $STAGE0_DIR/cascade
 
-  # Configure the image
-  #
-  # Enable the serial console and set lemurs as getty/login
-  sed -i '/ttyS0/c\s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs' $CASCADE_DIR/etc/inittab
-  # this is if we want to use the standard init/getty
-  # sed -i '/ttyS0/s/^#//' $CASCADE_DIR/etc/inittab
-  # Configure PAM to allow access by lemurs
-  cp $CASCADE_DIR/etc/pam.d/{login,lemurs}
+  # Setup cascade rootfs
+  mkdir -p $CASCADE_DIR/{usr/bin,usr/sbin,usr/lib,usr/lib64,etc/portage}
+  ln -s ./usr/bin $CASCADE_DIR/bin
+  ln -s ./usr/sbin $CASCADE_DIR/sbin
+  ln -s ./usr/lib $CASCADE_DIR/lib
+  ln -s ./usr/lib64 $CASCADE_DIR/lib64
+
   # Copy in the Cascade ebuild repo
   #
   # For now we put this in tmp because we need
   # to first create the local repo and then
   # copy these in with the appropriate permissions.
+  cp -r ebuild $STAGE0_DIR/tmp/
   cp -r ebuild $CASCADE_DIR/tmp/
   
   echo "
@@ -61,18 +70,12 @@ if [ ! -d $CASCADE_DIR/bin ]; then
   
   # This assumes that there aren't any other USE flags
   # set by default.
-  echo 'USE="dracut"' > /etc/portage/make.conf
+  echo 'USE="dracut"' >> /etc/portage/make.conf
+  echo 'ACCEPT_KEYWORDS="~amd64"' >> /etc/portage/make.conf
+  echo 'ACCEPT_LICENSE="*"' >> /etc/portage/make.conf
 
   emerge-webrsync
-
-  # unmerge definitely doesn't seem like the right
-  # thing to do here, but this was causing a conflict
-  #
-  # https://www.gentoo.org/support/news-items/2024-05-09-python3-12.html
-  #
-  # The latest stage file doesn't include python 3.12 yet
-  emerge --unmerge dev-python/hatchling
-  emerge sys-kernel/gentoo-kernel-bin
+  source /etc/profile
 
   # Add a local repository
   emerge app-eselect/eselect-repository
@@ -80,12 +83,96 @@ if [ ! -d $CASCADE_DIR/bin ]; then
   mv /tmp/ebuild/* /var/db/repos/cascade
   rm -r /tmp/ebuild
   chown -R portage:portage /var/db/repos/cascade
-  ebuild /var/db/repos/cascade/sys-auth/lemurs/*.ebuild manifest
+
+  emerge --update sys-apps/coreutils
+
+  # for now want to exit right after coreutils install
+  exit 0
+
+  ROOT=/cascade emerge sys-apps/coreutils
+  ROOT=/cascade emerge sys-apps/portage
+  # Emerge seems to use the 'mount' command, which is provided
+  # by this package.
+  ROOT=/cascade emerge sys-apps/util-linux
+  # Installs the gnu assembler.
+  ROOT=/cascade emerge sys-devel/binutils
+  # wget is a soft dependency of portage. It can be replaced
+  # by modifying FETCHCOMMAND and RESUMECOMMAND.
+  #
+  # For example: https://forums.gentoo.org/viewtopic-t-396901-start-0.html
+  ROOT=/cascade emerge net-misc/wget
+  # Necessary to set the locale after we chroot.
+  ROOT=/cascade emerge sys-apps/locale-gen
+  " > $STAGE0_DIR/setup
+  chmod +x $STAGE0_DIR/setup
+  chroot $STAGE0_DIR /setup
+  rm $STAGE0_DIR/setup
+
+  # for now want to just swap coreutils in stage0
+  exit 0
+
+  # Setup cascade for chroot
+  echo "nameserver 8.8.8.8" > $CASCADE_DIR/etc/resolv.conf
+  mkdir -p $CASCADE_DIR/{dev,proc,sys}
+  mount --rbind /dev $CASCADE_DIR/dev
+  mount --make-rslave $CASCADE_DIR/dev
+  mount -t proc /proc $CASCADE_DIR/proc
+  mount --rbind /sys $CASCADE_DIR/sys
+  mount --make-rslave $CASCADE_DIR/sys
+  
+  echo "
+  #!/bin/sh
+
+  set -e
+
+  # Really we should uncomment this rather than
+  # add a new line..
+  echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+  locale-gen
+  
+  # This assumes that there aren't any other USE flags
+  # set by default.
+  echo 'USE="dracut"' >> /etc/portage/make.conf
+  echo 'ACCEPT_KEYWORDS="~amd64"' >> /etc/portage/make.conf
+  echo 'ACCEPT_LICENSE="*"' >> /etc/portage/make.conf
+
+  emerge-webrsync
+
+  # Selecting default/linux/amd64/23.0 (stable)
+  # 
+  # Probably there is a more stable way to specify this?
+  eselect profile set 21
+
+  # Add a local repository
+  emerge app-eselect/eselect-repository
+  eselect repository create cascade
+  mv /tmp/ebuild/* /var/db/repos/cascade
+  rm -r /tmp/ebuild
+  chown -R portage:portage /var/db/repos/cascade
+
+  # TODO exiting for now to skip installs useful for vm
+  exit 0
+
+  emerge --update sys-apps/coreutils
+
   emerge sys-auth/lemurs
+  emerge sys-kernel/gentoo-kernel-bin
   " > $CASCADE_DIR/setup
   chmod +x $CASCADE_DIR/setup
   chroot $CASCADE_DIR /setup
   rm $CASCADE_DIR/setup
+
+  # TODO exiting for now because I don't want a vm
+  exit 0
+
+  # Configure the image
+  #
+  # Enable the serial console and set lemurs as getty/login
+  sed -i '/ttyS0/c\s0:12345:respawn:< /dev/ttyS0 > /dev/ttyS0 /bin/lemurs' $CASCADE_DIR/etc/inittab
+  # this is if we want to use the standard init/getty
+  # sed -i '/ttyS0/s/^#//' $STAGE0_DIR/etc/inittab
+  # Configure PAM to allow access by lemurs
+  cp $CASCADE_DIR/etc/pam.d/{login,lemurs}
 
   umount -lf $CASCADE_DIR/dev
   umount -lf $CASCADE_DIR/proc
