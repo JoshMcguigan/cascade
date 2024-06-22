@@ -368,10 +368,7 @@ src_compile() {
 		# CASCADE MOD: remove uu- prefix
 		PROG_PREFIX=""
 
-		# CASCADE MOD: disable multicall
-		# It would be nice to use this, but it breaks because gentoo install-xattr follows
-		# symlinks and calls `install` as `coreutils` which breaks things.
-		MULTICALL=n
+		MULTICALL=y
 
 		MANDIR="/share/man/man1"
 

@@ -1,0 +1,19 @@
+--- a/install-xattr.c	2019-11-10 00:57:01.000000000 -0000
++++ b/install-xattr.c	2024-06-22 17:30:31.245914099 -0000
+@@ -176,15 +176,12 @@
+ 		path = xstrdup(env_path);
+ 
+ 	char *dir;       /* one directory in the colon delimited $PATH string */
+-	char *canpath;   /* candidate install's canonical path                */
+ 	char *savedptr;  /* reentrant context for strtok_r()                  */
+ 
+ 	dir = strtok_r(path, ":", &savedptr);
+ 
+ 	while (dir) {
+-		char *canfile = path_join(dir, "install");
+-		canpath = realpath(canfile, NULL);
+-		free(canfile);
++		char *canpath = path_join(dir, "install");
+ 
+ 		/* ignore invalid paths that cannot be canonicalized */
+ 		if (!canpath)
