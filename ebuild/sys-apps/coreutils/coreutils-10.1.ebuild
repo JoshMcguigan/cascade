@@ -397,5 +397,10 @@ src_test() {
 
 src_install() {
 	emake "${makeargs[@]}" DESTDIR="${D}" install
-	dobin "${FILESDIR}/md5sum"
+	# CASCADE MOD: symlink these extra binaries which aren't installed
+	# by default
+	#
+	# https://github.com/uutils/coreutils/issues/6491
+	dosym coreutils /bin/md5sum
+	dosym coreutils /bin/sha256sum
 }
