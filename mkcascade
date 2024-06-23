@@ -64,6 +64,9 @@ if [ ! -d $STAGE3_DIR/bin ]; then
   emerge-webrsync
   source /etc/profile
 
+  # Install the Linux kernel.
+  emerge sys-kernel/gentoo-kernel-bin
+
   # Add a local repository
   emerge app-eselect/eselect-repository
   eselect repository create cascade
@@ -75,10 +78,32 @@ if [ ! -d $STAGE3_DIR/bin ]; then
   # to follow symlinks and break uutils coreutils.
   emerge --update sys-apps/install-xattr::cascade
 
+  # Replace GNU coreutils with uutils coreutils.
   emerge --update sys-apps/coreutils::cascade
+
+  # Enable ttys0
+  sed -i '/ttyS0/s/^#//' etc/inittab
   " > $STAGE3_DIR/setup
   chmod +x $STAGE3_DIR/setup
   chroot $STAGE3_DIR /setup
   rm $STAGE3_DIR/setup
+
+  # Make disk image
+  dd if=/dev/zero of=$HD_PATH bs=1M count=10000
+  # Set owner back to user so they can start qemu without sudo
+  chown $SUDO_USER:$SUDO_USER $HD_PATH
+
+  TMP_MNT=/mnt/cascade
+  mkdir -p $TMP_MNT
+  mkfs.ext4 $HD_PATH
+  mount $HD_PATH $TMP_MNT
+  cp -r $STAGE3_DIR/{bin,boot,etc,home,lib,lib64,media,opt,root,run,sbin,usr,var} $TMP_MNT
+  mkdir $TMP_MNT/{dev,proc,sys}
+
+  # Create blank root password
+  passwd --root $TMP_MNT root -d
+
+  umount $TMP_MNT
+  unset TMP_MNT
 fi
 

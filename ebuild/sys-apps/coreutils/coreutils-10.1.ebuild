@@ -323,7 +323,9 @@ LICENSE="MIT"
 # Dependent crate licenses
 LICENSE+=" Apache-2.0 BSD-2 BSD CC0-1.0 ISC MIT Unicode-DFS-2016"
 SLOT="0"
-IUSE="debug selinux test"
+# CASCADE MOD: say that we use xattr, so that dracut doesn't assume
+# we don't (and then try to reinstall GNU coreutils).
+IUSE="debug selinux test xattr"
 RESTRICT="!test? ( test )"
 
 DEPEND="
